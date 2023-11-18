@@ -1,4 +1,4 @@
-Shader "Custom/Water" {
+Shader "Custom/Grass" {
 	SubShader {
 		Tags {
 			"LightMode" = "ForwardBase"
@@ -121,8 +121,7 @@ Shader "Custom/Water" {
 				float2 localUV = frac(newUV) * 2 - 1;
 
 				float localDistanceFromCenter = length(localUV);
-				// This casts the above uvs to uint so it can be more easily passed into the hashing function without doing a ton of annoying casts because
-				// type casting can be really annoying and really ruin your day and you will generally not notice for potentially hours sometimes
+				//typecast uv to int
                 uint2 tid = newUV;
 				uint seed = tid.x + 100 * tid.y + 100 * 10;
 
@@ -132,33 +131,18 @@ Shader "Custom/Water" {
                 float rand = lerp(_NoiseMin, _NoiseMax, hash(seed));
 				//normalized shell height
                 float h = shellIndex / shellCount;
-
 				//calculate distance for pixels to be outside of thickness
 				int outsideThickness = (localDistanceFromCenter) > (_Thickness * (rand - h));
-				
 				//culls pixels outside of thickness
 				if (outsideThickness && _ShellIndex > 0) discard;
-				// This is the lighting output since at this point we have determined we are not discarding the pixel, so we have to color it
-				// This lighting model is a modification of the Valve's half lambert as described in the video. It is not physically based, but it looks cool I think.
-				// What's going on here is we take the dot product between the normal and the direction of the main Unity light source (the sun) which returns a value
-				// between -1 to 1, which is then clamped to 0 to 1 by the DotClamped function provided by Unity, we then convert the 0 to 1 to 0.5 to 1 with the following
-				// multiplication and addition.
+				//calculate dot product of normal and sun light
 				float ndotl = DotClamped(i.normal, _WorldSpaceLightPos0) * 0.5f + 0.5f;
-				// Valve's half lambert squares the ndotl output, which is going to bring values down, once again you can see how this looks on desmos by graphing x^2
 				ndotl = ndotl * ndotl;
-				// In order to fake ambient occlusion, we take the normalized shell height and take it to an attenuation exponent, which will do the same exact thing
-				// I have explained that exponents will do to numbers between 0 and 1. A higher attenuation value means the occlusion of ambient light will become much stronger,
-				// as the number is brought down closer to 0, and if we multiply a color with 0 then it'll be black aka in shadow.
+				//fake ambient occlusion by using height
 				float ambientOcclusion = pow(h, _Attenuation);
-				// This is a additive bias on the ambient occlusion, if you don't want the gradient to go towards black then you can add a bit to this in order to prevent
-				// such a harsh gradient transition
 				ambientOcclusion += _OcclusionBias;
-				// Since the bias can push the ambient occlusion term above 1, we want to clamp it to 0 to 1 in order to prevent breaking the laws of physics by producing
-				// more light than was received since if you multiply a color with a number greater than 1, it'll become brighter, and that just physically does not make
-				// sense in this context
 				ambientOcclusion = saturate(ambientOcclusion);
-				// We put it all together down here by multiplying the color with Valve's half lambert and our fake ambient occlusion. You can remove some of these terms
-				// to see how it changes the lighting and shadowing.
+				//multiply color by ao
                 return float4(_ShellColor * ndotl * ambientOcclusion, 1.0);
 			}
 
